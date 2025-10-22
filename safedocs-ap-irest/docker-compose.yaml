@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    # Internal service: no public port exposure. Accessible by other services via the network.
+    # Healthcheck to ensure it's ready before gateway attempts calls.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/" ]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  files-service:
+    build: ./files-service
+    container_name: files-service
+    # Internal service: no public port exposure. Accessible by other services via the network.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/" ]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  gateway:
+    build: ./gateway
+    container_name: gateway
+    # Expose the gateway on the host so you can open the UI in a browser.
+    ports:
+      - "3000:80"
+    environment:
+      # These environment variables allow the gateway to call the other services
+      - AUTH_URL=http://auth-service:3001
+      - FILES_URL=http://files-service:3002
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      files-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
